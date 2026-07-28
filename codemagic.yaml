@@ -27,11 +27,12 @@ workflows:
         script: |
           echo "$CM_CERTIFICATE" | base64 --decode > /tmp/cert.p12
           keychain add-certificates --certificate /tmp/cert.p12 --certificate-password "$CM_CERTIFICATE_PASSWORD"
-      - name: Fetch provisioning profile from Apple
+      - name: Import provisioning profile
         script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --platform IOS
+          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_HOME"
+          printf '%s' "$CM_PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_HOME/proveit.mobileprovision"
+          ls -l "$PROFILES_HOME"
       - name: Set up code signing settings on Xcode project
         script: xcode-project use-profiles
       - name: Build ipa
