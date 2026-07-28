@@ -60,7 +60,7 @@ function Auth() {
       else setMsg('Account created. You can log in now.')
     } else if (mode === 'forgot') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: 'https://prove-it-now.netlify.app',
       })
       if (error) setMsg(error.message)
       else setMsg('Check your email for the reset link.')
