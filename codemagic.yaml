@@ -5,6 +5,7 @@ workflows:
     environment:
       groups:
         - supabase_proveit
+        - iOS_signing_proveit
       vars:
         BUNDLE_ID: "com.avocadopoker.proveit"
         XCODE_WORKSPACE: "App.xcworkspace"
@@ -22,18 +23,14 @@ workflows:
         script: npx cap sync ios
       - name: Set up keychain
         script: keychain initialize
-      - name: Create signing certificate
+      - name: Import certificate
         script: |
-          app-store-connect create-certificate \
-            --type IOS_DISTRIBUTION \
-            --save
-      - name: Fetch signing files
+          echo "$CM_CERTIFICATE" | base64 --decode > /tmp/cert.p12
+          keychain add-certificates --certificate /tmp/cert.p12 --certificate-password "$CM_CERTIFICATE_PASSWORD"
+      - name: Import provisioning profile
         script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-      - name: Add certificates to keychain
-        script: keychain add-certificates
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$CM_PROVISIONING_PROFILE" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/profile.mobileprovision"
       - name: Set up code signing settings on Xcode project
         script: xcode-project use-profiles
       - name: Build ipa
