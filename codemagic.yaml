@@ -8,7 +8,7 @@ workflows:
         - iOS_signing_proveit
       vars:
         BUNDLE_ID: "com.avocadopoker.proveit"
-        XCODE_WORKSPACE: "App.xcworkspace"
+        XCODE_PROJECT: "App.xcodeproj"
         XCODE_SCHEME: "App"
       node: 22
       xcode: latest
@@ -37,7 +37,7 @@ workflows:
         script: |
           cd ios/App
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
+            --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
