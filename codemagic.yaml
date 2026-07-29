@@ -21,6 +21,10 @@ workflows:
         script: npm run build
       - name: Sync Capacitor iOS
         script: npx cap sync ios
+      - name: Set build number (auto-increment)
+        script: |
+          cd ios/App
+          agvtool new-version -all $BUILD_NUMBER
       - name: Set up keychain
         script: keychain initialize
       - name: Import certificate
@@ -32,7 +36,6 @@ workflows:
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           printf '%s' "$CM_PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_HOME/proveit.mobileprovision"
-          ls -l "$PROFILES_HOME"
       - name: Set up code signing settings on Xcode project
         script: xcode-project use-profiles
       - name: Build ipa

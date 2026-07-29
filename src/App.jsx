@@ -245,7 +245,7 @@ function Countdown({ deadline }) {
   const s = Math.floor((left % 60000) / 1000)
   return (
     <span className="countdown">
-      {d > 0 && `${d}d `}{String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(s).padStart(2, '0')} left
+      {d > 0 && `${d} ${d === 1 ? 'Day' : 'Days'} `}{String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
     </span>
   )
 }
@@ -286,6 +286,7 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
   const [file, setFile] = useState(null)
   const [showUpload, setShowUpload] = useState(false)
   const [err, setErr] = useState('')
+  const [sheet, setSheet] = useState(null) // 'guides' | 'proof'
 
   async function submitProof(e) {
     e.preventDefault()
@@ -311,12 +312,19 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
       </div>
       <h2 className="active-title">{c.title}</h2>
       <p className="active-desc">{c.description}</p>
-      {c.resources && (
-        <div className="resources"><span className="section-head">HOW TO GET IT DONE</span><p>{c.resources}</p></div>
-      )}
-      <div className="proof-rule">Your face must be visible in the proof. No you, no points.</div>
 
       <ProgressComposer assignmentId={active.id} uid={uid} />
+
+      <div className="info-boxes">
+        <button className="info-box" onClick={() => setSheet('guides')}>
+          <span className="info-box-title">Guides</span>
+          <span className="info-box-sub">Steps & paths to get it done</span>
+        </button>
+        <button className="info-box" onClick={() => setSheet('proof')}>
+          <span className="info-box-title">Proof requirements</span>
+          <span className="info-box-sub">What your proof must show</span>
+        </button>
+      </div>
 
       {submission ? (
         <div className="submitted-state">
@@ -335,6 +343,22 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
           <button className="btn-primary" disabled={uploading}>{uploading ? 'Uploading…' : 'Submit proof'}</button>
           {err && <p className="auth-msg">{err}</p>}
         </form>
+      )}
+
+      {sheet && (
+        <div className="overlay">
+          <div className="overlay-head">
+            <button className="back" onClick={() => setSheet(null)}>← Back</button>
+            <span className="overlay-title">{sheet === 'guides' ? 'Guides' : 'Proof requirements'}</span>
+          </div>
+          <div className="overlay-body">
+            <p className="sheet-text">
+              {sheet === 'guides'
+                ? (c.resources || 'No guide added for this challenge yet.')
+                : (c.proof_requirements || 'Your face must be clearly visible in the proof, and it must show the full action being completed. No you, no points.')}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   )
