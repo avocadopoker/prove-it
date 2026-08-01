@@ -264,27 +264,70 @@ function msLeft(deadline) { return new Date(deadline).getTime() - Date.now() }
 /* ---------------- CHALLENGE ---------------- */
 
 const TIERS = [
-  { key: 'easy', label: 'EASY', min: 1, max: 5, color: '#2ecc71' },
-  { key: 'medium', label: 'MEDIUM', min: 6, max: 10, color: '#f1c40f' },
-  { key: 'hard', label: 'HARD', min: 11, max: 15, color: '#e67e22' },
+  { key: 'easy', label: 'EASY', min: 1, max: 5, color: '#22c55e' },
+  { key: 'medium', label: 'MEDIUM', min: 6, max: 10, color: '#eab308' },
+  { key: 'hard', label: 'HARD', min: 11, max: 15, color: '#f97316' },
   { key: 'veryhard', label: 'VERY HARD', min: 16, max: 20, color: '#e5142d' },
 ]
 function tierForPoints(pts) {
   return TIERS.find((t) => pts >= t.min && pts <= t.max) || TIERS[0]
 }
 
+// Build proportional wheel slices from the live catalogue distribution
+function buildSlices(counts) {
+  const total = TIERS.reduce((sum, t) => sum + (counts[t.key] || 0), 0)
+  let cursor = 0
+  return TIERS.map((t) => {
+    const share = total > 0 ? (counts[t.key] || 0) / total : 1 / TIERS.length
+    const sweep = share * 360
+    const slice = { ...t, start: cursor, sweep, mid: cursor + sweep / 2 }
+    cursor += sweep
+    return slice
+  }).filter((s) => s.sweep > 0.01)
+}
+
+function arcPath(cx, cy, r, startDeg, sweepDeg) {
+  if (sweepDeg >= 359.99) {
+    return `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
+  }
+  const rad = (d) => ((d - 90) * Math.PI) / 180
+  const x1 = cx + r * Math.cos(rad(startDeg))
+  const y1 = cy + r * Math.sin(rad(startDeg))
+  const x2 = cx + r * Math.cos(rad(startDeg + sweepDeg))
+  const y2 = cy + r * Math.sin(rad(startDeg + sweepDeg))
+  const large = sweepDeg > 180 ? 1 : 0
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`
+}
+
 function ChallengeScreen({ uid, active, onChange }) {
   const [spinning, setSpinning] = useState(false)
-  const [wheelRotation, setWheelRotation] = useState(0)
+  const [rotation, setRotation] = useState(0)
   const [err, setErr] = useState('')
   const [revealReady, setRevealReady] = useState(false)
+  const [landedTier, setLandedTier] = useState(null)
+  const [counts, setCounts] = useState({})
+
+  // Load catalogue distribution so slice sizes mirror real composition
+  useEffect(() => {
+    ;(async () => {
+      const { data } = await supabase.from('challenges').select('points').eq('is_active', true)
+      const c = {}
+      ;(data || []).forEach((row) => {
+        const k = tierForPoints(row.points).key
+        c[k] = (c[k] || 0) + 1
+      })
+      setCounts(c)
+    })()
+  }, [])
+
+  const slices = buildSlices(counts)
 
   async function claim() {
     setErr('')
     setSpinning(true)
     setRevealReady(false)
+    setLandedTier(null)
 
-    // Pick the challenge in the background first (user doesn't see it yet)
     const { data: assignmentId, error } = await supabase.rpc('assign_random_challenge')
     if (error) {
       setErr(error.message)
@@ -294,24 +337,25 @@ function ChallengeScreen({ uid, active, onChange }) {
     const { data: a } = await supabase
       .from('assignments').select('challenge:challenges(points)').eq('id', assignmentId).single()
     const pts = a?.challenge?.points || 1
-    const tierIndex = TIERS.findIndex((t) => t.key === tierForPoints(pts).key)
+    const tier = tierForPoints(pts)
+    const slice = slices.find((s) => s.key === tier.key) || slices[0]
 
-    // Wheel has 4 segments; spin several full turns then land centered on the tier segment
-    const segmentDeg = 360 / TIERS.length
-    const targetDeg = tierIndex * segmentDeg + segmentDeg / 2
-    const spins = 5 * 360
-    const finalRotation = spins + (360 - targetDeg)
-    setWheelRotation(finalRotation)
+    // Land the pointer (top, 0deg) inside the winning slice, slightly randomised
+    const jitter = (Math.random() - 0.5) * Math.max(slice.sweep * 0.6, 2)
+    const target = slice.mid + jitter
+    const finalRotation = 6 * 360 + (360 - target)
 
+    setRotation(finalRotation)
+    setLandedTier(tier)
     setTimeout(() => {
       setSpinning(false)
       setRevealReady(true)
-    }, 3200)
+    }, 4100)
   }
 
   function reveal() {
     setRevealReady(false)
-    setWheelRotation(0)
+    setRotation(0)
     onChange()
   }
 
@@ -320,28 +364,41 @@ function ChallengeScreen({ uid, active, onChange }) {
       <div className="wheel-stage">
         <div className="wheel-wrap">
           <div className="wheel-pointer" />
-          <div
-            className="wheel"
-            style={{ transform: `rotate(${wheelRotation}deg)`, transition: spinning ? 'transform 3.1s cubic-bezier(.17,.67,.16,1)' : 'none' }}
+          <svg
+            className="wheel-svg"
+            viewBox="0 0 200 200"
+            style={{
+              transform: `rotate(${rotation}deg)`,
+              transition: spinning ? 'transform 4s cubic-bezier(.12,.72,.14,1)' : 'none',
+            }}
           >
-            {TIERS.map((t, i) => (
-              <div
-                key={t.key}
-                className="wheel-seg"
-                style={{
-                  transform: `rotate(${i * (360 / TIERS.length)}deg)`,
-                  background: t.color,
-                }}
-              >
-                <span className="wheel-seg-label" style={{ transform: `rotate(${180 / TIERS.length}deg)` }}>{t.label}</span>
-              </div>
+            <circle cx="100" cy="100" r="98" fill="#fff" />
+            {slices.map((s) => (
+              <path key={s.key} d={arcPath(100, 100, 96, s.start, s.sweep)} fill={s.color} />
             ))}
-          </div>
+            {slices.filter((s) => s.sweep > 22).map((s) => (
+              <text
+                key={s.key}
+                x="100"
+                y="34"
+                textAnchor="middle"
+                className="wheel-label"
+                transform={`rotate(${s.mid} 100 100)`}
+              >
+                {s.label}
+              </text>
+            ))}
+            <circle cx="100" cy="100" r="97" fill="none" stroke="#e6e6ea" strokeWidth="4" />
+            <circle cx="100" cy="100" r="16" fill="#fff" stroke="#e6e6ea" strokeWidth="3" />
+          </svg>
         </div>
         {spinning ? (
           <p className="wheel-caption">Drawing your fate…</p>
         ) : (
-          <button className="btn-primary big" onClick={reveal}>Reveal challenge</button>
+          <>
+            <p className="wheel-result" style={{ color: landedTier?.color }}>{landedTier?.label}</p>
+            <button className="btn-primary big" onClick={reveal}>Reveal challenge</button>
+          </>
         )}
       </div>
     )

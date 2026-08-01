@@ -219,25 +219,26 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 /* ---------- WHEEL ---------- */
-.wheel-stage { display: flex; flex-direction: column; align-items: center; padding: 2rem 0.5rem; gap: 1.75rem; }
-.wheel-wrap { position: relative; width: 280px; height: 280px; }
+.wheel-stage { display: flex; flex-direction: column; align-items: center; padding: 2.5rem 0.5rem; gap: 1.5rem; }
+.wheel-wrap { position: relative; width: 300px; height: 300px; display: grid; place-items: center; }
 .wheel-pointer {
-  position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
-  width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent;
-  border-top: 22px solid var(--black); z-index: 2;
+  position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent;
+  border-top: 26px solid var(--black); z-index: 3;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,0.28));
 }
-.wheel {
-  width: 280px; height: 280px; border-radius: 50%; position: relative; overflow: hidden;
-  box-shadow: 0 10px 40px rgba(20,20,26,0.18), 0 0 0 6px #fff, 0 0 0 8px var(--line);
+.wheel-svg {
+  width: 300px; height: 300px; border-radius: 50%; display: block;
+  box-shadow: 0 14px 44px rgba(20,20,26,0.20), 0 0 0 8px #fff, 0 0 0 10px var(--line);
 }
-.wheel-seg {
-  position: absolute; width: 50%; height: 50%; top: 0; left: 50%;
-  transform-origin: 0% 100%;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
+.wheel-label {
+  font-family: var(--display); font-weight: 700; font-size: 11px;
+  fill: #fff; letter-spacing: 0.06em;
+  paint-order: stroke; stroke: rgba(0,0,0,0.18); stroke-width: 2px;
 }
-.wheel-seg-label {
-  position: absolute; top: 22%; left: -18%; transform-origin: 0 0;
-  font-family: var(--display); font-weight: 700; color: #fff; font-size: 0.72rem; letter-spacing: 0.05em;
-  width: 90px; text-align: center; display: block;
+.wheel-caption { font-family: var(--display); color: var(--muted); font-weight: 600; letter-spacing: 0.06em; margin: 0; }
+.wheel-result {
+  font-family: var(--display); font-weight: 700; font-size: 1.9rem; letter-spacing: -0.01em; margin: 0;
+  animation: pop 0.45s cubic-bezier(.2,1.4,.4,1);
 }
-.wheel-caption { font-family: var(--display); color: var(--muted); font-weight: 600; letter-spacing: 0.05em; }
+@keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
