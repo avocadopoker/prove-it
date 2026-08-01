@@ -132,8 +132,7 @@ function Main({ session }) {
 
   useEffect(() => {
     ;(async () => {
-      await supabase.from('assignments').update({ status: 'failed' })
-        .eq('user_id', uid).eq('status', 'active').lt('deadline', new Date().toISOString())
+      await supabase.rpc('expire_overdue_assignments')
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', uid).single()
       setProfile(prof)
       const { data: a } = await supabase.from('assignments')
@@ -239,13 +238,24 @@ function Countdown({ deadline }) {
     return () => clearInterval(t)
   }, [deadline])
   if (left <= 0) return <span className="countdown over">Time's up</span>
-  const d = Math.floor(left / 86400000)
-  const h = Math.floor((left % 86400000) / 3600000)
-  const m = Math.floor((left % 3600000) / 60000)
+
+  const HOUR = 3600000
+  const DAY = 86400000
+
+  if (left > 2 * DAY) {
+    const d = Math.ceil(left / DAY)
+    return <span className="countdown">{d} {d === 1 ? 'Day' : 'Days'} left</span>
+  }
+  if (left > DAY) {
+    const h = Math.ceil(left / HOUR)
+    return <span className="countdown">{h} {h === 1 ? 'hour' : 'hours'} left</span>
+  }
+  const h = Math.floor(left / HOUR)
+  const m = Math.floor((left % HOUR) / 60000)
   const s = Math.floor((left % 60000) / 1000)
   return (
     <span className="countdown">
-      {d > 0 && `${d} ${d === 1 ? 'Day' : 'Days'} `}{String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
+      {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
     </span>
   )
 }
@@ -253,15 +263,88 @@ function msLeft(deadline) { return new Date(deadline).getTime() - Date.now() }
 
 /* ---------------- CHALLENGE ---------------- */
 
+const TIERS = [
+  { key: 'easy', label: 'EASY', min: 1, max: 5, color: '#2ecc71' },
+  { key: 'medium', label: 'MEDIUM', min: 6, max: 10, color: '#f1c40f' },
+  { key: 'hard', label: 'HARD', min: 11, max: 15, color: '#e67e22' },
+  { key: 'veryhard', label: 'VERY HARD', min: 16, max: 20, color: '#e5142d' },
+]
+function tierForPoints(pts) {
+  return TIERS.find((t) => pts >= t.min && pts <= t.max) || TIERS[0]
+}
+
 function ChallengeScreen({ uid, active, onChange }) {
-  const [busy, setBusy] = useState(false)
+  const [spinning, setSpinning] = useState(false)
+  const [wheelRotation, setWheelRotation] = useState(0)
   const [err, setErr] = useState('')
+  const [revealReady, setRevealReady] = useState(false)
 
   async function claim() {
-    setBusy(true); setErr('')
-    const { error } = await supabase.rpc('assign_random_challenge')
-    if (error) setErr(error.message)
-    onChange(); setBusy(false)
+    setErr('')
+    setSpinning(true)
+    setRevealReady(false)
+
+    // Pick the challenge in the background first (user doesn't see it yet)
+    const { data: assignmentId, error } = await supabase.rpc('assign_random_challenge')
+    if (error) {
+      setErr(error.message)
+      setSpinning(false)
+      return
+    }
+    const { data: a } = await supabase
+      .from('assignments').select('challenge:challenges(points)').eq('id', assignmentId).single()
+    const pts = a?.challenge?.points || 1
+    const tierIndex = TIERS.findIndex((t) => t.key === tierForPoints(pts).key)
+
+    // Wheel has 4 segments; spin several full turns then land centered on the tier segment
+    const segmentDeg = 360 / TIERS.length
+    const targetDeg = tierIndex * segmentDeg + segmentDeg / 2
+    const spins = 5 * 360
+    const finalRotation = spins + (360 - targetDeg)
+    setWheelRotation(finalRotation)
+
+    setTimeout(() => {
+      setSpinning(false)
+      setRevealReady(true)
+    }, 3200)
+  }
+
+  function reveal() {
+    setRevealReady(false)
+    setWheelRotation(0)
+    onChange()
+  }
+
+  if (!active && (spinning || revealReady)) {
+    return (
+      <div className="wheel-stage">
+        <div className="wheel-wrap">
+          <div className="wheel-pointer" />
+          <div
+            className="wheel"
+            style={{ transform: `rotate(${wheelRotation}deg)`, transition: spinning ? 'transform 3.1s cubic-bezier(.17,.67,.16,1)' : 'none' }}
+          >
+            {TIERS.map((t, i) => (
+              <div
+                key={t.key}
+                className="wheel-seg"
+                style={{
+                  transform: `rotate(${i * (360 / TIERS.length)}deg)`,
+                  background: t.color,
+                }}
+              >
+                <span className="wheel-seg-label" style={{ transform: `rotate(${180 / TIERS.length}deg)` }}>{t.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {spinning ? (
+          <p className="wheel-caption">Drawing your fate…</p>
+        ) : (
+          <button className="btn-primary big" onClick={reveal}>Reveal challenge</button>
+        )}
+      </div>
+    )
   }
 
   if (!active) {
@@ -270,7 +353,7 @@ function ChallengeScreen({ uid, active, onChange }) {
         <p className="empty-eyebrow">NO ACTIVE CHALLENGE</p>
         <h2>Ready to prove it?</h2>
         <p className="empty-body">You don't choose. Claim a challenge and the clock starts. Miss the deadline and it's a loss.</p>
-        <button className="btn-primary big" onClick={claim} disabled={busy}>{busy ? 'Drawing…' : 'Claim a challenge'}</button>
+        <button className="btn-primary big" onClick={claim} disabled={spinning}>{spinning ? 'Drawing…' : 'Claim a challenge'}</button>
         {err && <p className="auth-msg">{err}</p>}
       </div>
     )
