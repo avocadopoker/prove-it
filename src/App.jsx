@@ -219,10 +219,19 @@ function Home({ uid, active, openProfile, openAssignment }) {
                 {(f.owner_name || '?').charAt(0).toUpperCase()}
               </span>
               <span className="feed-body">
-                <span className="feed-line"><b>{f.owner_name || 'Someone'}</b> proved it</span>
+                <span className="feed-line">
+                  <b>{f.owner_name || 'Someone'}</b>{' '}
+                  {f.event_type === 'cancelled' ? (
+                    <span className="feed-verb cancelled">bailed on</span>
+                  ) : (
+                    <span className="feed-verb">proved it</span>
+                  )}
+                </span>
                 <span className="feed-challenge">{f.challenge_title}</span>
               </span>
-              <span className="feed-pts">+{f.points}</span>
+              <span className={`feed-pts ${f.event_type === 'cancelled' ? 'neg' : ''}`}>
+                {f.event_type === 'cancelled' ? f.points - 21 : `+${f.points}`}
+              </span>
             </button>
           ))}
         </div>
@@ -427,6 +436,23 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
   const [showUpload, setShowUpload] = useState(false)
   const [err, setErr] = useState('')
   const [sheet, setSheet] = useState(null) // 'guides' | 'proof'
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelErr, setCancelErr] = useState('')
+
+  async function doCancel() {
+    setCancelling(true)
+    setCancelErr('')
+    const { error } = await supabase.rpc('cancel_challenge', { p_assignment: active.id })
+    if (error) {
+      setCancelErr(error.message)
+      setCancelling(false)
+      return
+    }
+    setCancelling(false)
+    setConfirmCancel(false)
+    onChange()
+  }
 
   async function submitProof(e) {
     e.preventDefault()
@@ -483,6 +509,31 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
           <button className="btn-primary" disabled={uploading}>{uploading ? 'Uploading…' : 'Submit proof'}</button>
           {err && <p className="auth-msg">{err}</p>}
         </form>
+      )}
+
+      {!submission && (
+        <button className="cancel-link" onClick={() => setConfirmCancel(true)}>
+          Cancel this challenge
+        </button>
+      )}
+
+      {confirmCancel && (
+        <div className="confirm-backdrop" onClick={() => setConfirmCancel(false)}>
+          <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
+            <h3>Cancel this challenge?</h3>
+            <p>
+              You'll lose <b>{21 - c.points} points</b> and it will show up in your friends' feed.
+              This can't be undone.
+            </p>
+            {cancelErr && <p className="auth-msg">{cancelErr}</p>}
+            <div className="confirm-actions">
+              <button className="btn-ghost" onClick={() => setConfirmCancel(false)}>Keep going</button>
+              <button className="btn-danger-solid" onClick={doCancel} disabled={cancelling}>
+                {cancelling ? 'Cancelling…' : 'Cancel challenge'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {sheet && (
@@ -731,7 +782,7 @@ function ProfileView({ uid, userId, onClose, openAssignment }) {
     } else setProgress([])
     const { data: hist } = await supabase.from('assignments')
       .select('*, challenge:challenges(title,points)').eq('user_id', userId)
-      .in('status', ['completed', 'failed']).order('assigned_at', { ascending: false })
+      .in('status', ['completed', 'failed', 'cancelled']).order('assigned_at', { ascending: false })
     setPast(hist || [])
     if (!isMe) {
       const { data: fol } = await supabase.from('follows').select('*').eq('follower', uid).eq('following', userId).maybeSingle()

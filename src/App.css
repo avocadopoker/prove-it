@@ -242,3 +242,32 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
   animation: pop 0.45s cubic-bezier(.2,1.4,.4,1);
 }
 @keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+/* ---------- CANCEL ---------- */
+.cancel-link {
+  display: block; width: 100%; margin-top: 1.25rem; padding: 0.75rem;
+  background: none; border: none; color: var(--muted); font-weight: 600;
+  font-size: 0.9rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.cancel-link:hover { color: var(--red); }
+.confirm-backdrop {
+  position: fixed; inset: 0; background: rgba(10,10,11,0.45); backdrop-filter: blur(3px);
+  display: grid; place-items: center; padding: 1.25rem; z-index: 40;
+}
+.confirm-box {
+  background: #fff; border-radius: 18px; padding: 1.5rem; max-width: 360px; width: 100%;
+  box-shadow: var(--shadow-lg); text-align: center;
+}
+.confirm-box h3 { font-family: var(--display); margin: 0 0 0.6rem; color: var(--black); }
+.confirm-box p { color: var(--muted); line-height: 1.5; margin: 0 0 1.25rem; font-size: 0.95rem; }
+.confirm-box p b { color: var(--red); }
+.confirm-actions { display: flex; gap: 0.6rem; }
+.confirm-actions button { flex: 1; }
+.btn-danger-solid {
+  padding: 0.85rem 1rem; border: none; border-radius: 12px; background: var(--red);
+  color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px var(--red-glow);
+}
+.btn-danger-solid:disabled { opacity: 0.6; cursor: default; }
+.feed-verb.cancelled { color: var(--muted); font-style: italic; }
+.feed-pts.neg { color: var(--muted); }
+.hist-badge.cancelled { background: var(--surface-2); color: var(--muted); }
