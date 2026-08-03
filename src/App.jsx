@@ -302,10 +302,10 @@ function ChallengeScreen({ uid, active, onChange }) {
       return
     }
     const { data: a } = await supabase
-      .from('assignments').select('challenge:challenges(title, points)').eq('id', assignmentId).single()
+      .from('assignments').select('challenge:challenges(title, points, domain)').eq('id', assignmentId).single()
     const title = a?.challenge?.title || 'Mystery challenge'
     const pts = a?.challenge?.points || 1
-    setDrawn({ title, points: pts, tier: tierForPoints(pts) })
+    setDrawn({ title, points: pts, domain: a?.challenge?.domain || '', tier: tierForPoints(pts) })
     setBusy(false)
   }
 
@@ -460,6 +460,7 @@ function ScratchTicket({ drawn, onViewDetails }) {
         <div className="ticket-body" ref={wrapRef}>
           <div className="ticket-content">
             <span className="ticket-tier" style={{ color: drawn.tier.color }}>{drawn.tier.label}</span>
+            {drawn.domain && <span className="ticket-domain">{drawn.domain}</span>}
             <span className="ticket-title">{drawn.title}</span>
             <span className="ticket-points">{drawn.points} PTS</span>
           </div>
@@ -533,6 +534,7 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
         <span className="pts-badge">{c.points} PT{c.points === 1 ? '' : 'S'}</span>
         <Countdown deadline={active.deadline} />
       </div>
+      {c.domain && <span className="domain-tag">{c.domain}</span>}
       <h2 className="active-title">{c.title}</h2>
       <p className="active-desc">{c.description}</p>
 

@@ -115,6 +115,12 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .empty-body { color: var(--muted); line-height: 1.5; max-width: 320px; margin: 0 auto; }
 .active-head { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1rem; }
 .pts-badge { font-family: var(--display); font-weight: 700; background: var(--red); color: #fff; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.85rem; box-shadow: 0 4px 14px var(--red-glow); }
+.domain-tag {
+  display: inline-block; font-family: var(--display); font-weight: 700; font-size: 0.68rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
+  padding: 0.22rem 0.65rem; margin-bottom: 0.5rem;
+}
 .active-title { font-family: var(--display); font-weight: 700; font-size: 1.6rem; line-height: 1.15; margin: 0 0 0.75rem; color: var(--black); }
 .active-desc { color: #3a3a42; line-height: 1.55; }
 
@@ -242,6 +248,10 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
   font-family: var(--display); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.14em;
 }
 .ticket-title { font-family: var(--display); font-weight: 700; font-size: 1.35rem; color: var(--black); line-height: 1.2; }
+.ticket-domain {
+  font-family: var(--display); font-weight: 600; font-size: 0.65rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
 .ticket-points {
   font-family: var(--display); font-weight: 700; font-size: 0.85rem; color: var(--red);
   background: var(--red-soft); padding: 0.25rem 0.7rem; border-radius: 20px;
