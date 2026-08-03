@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import './App.css'
 
@@ -282,135 +282,35 @@ function tierForPoints(pts) {
   return TIERS.find((t) => pts >= t.min && pts <= t.max) || TIERS[0]
 }
 
-// Build proportional wheel slices from the live catalogue distribution
-function buildSlices(counts) {
-  const total = TIERS.reduce((sum, t) => sum + (counts[t.key] || 0), 0)
-  let cursor = 0
-  return TIERS.map((t) => {
-    const share = total > 0 ? (counts[t.key] || 0) / total : 1 / TIERS.length
-    const sweep = share * 360
-    const slice = { ...t, start: cursor, sweep, mid: cursor + sweep / 2 }
-    cursor += sweep
-    return slice
-  }).filter((s) => s.sweep > 0.01)
-}
-
-function arcPath(cx, cy, r, startDeg, sweepDeg) {
-  if (sweepDeg >= 359.99) {
-    return `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
-  }
-  const rad = (d) => ((d - 90) * Math.PI) / 180
-  const x1 = cx + r * Math.cos(rad(startDeg))
-  const y1 = cy + r * Math.sin(rad(startDeg))
-  const x2 = cx + r * Math.cos(rad(startDeg + sweepDeg))
-  const y2 = cy + r * Math.sin(rad(startDeg + sweepDeg))
-  const large = sweepDeg > 180 ? 1 : 0
-  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`
-}
-
 function ChallengeScreen({ uid, active, onChange }) {
-  const [spinning, setSpinning] = useState(false)
-  const [rotation, setRotation] = useState(0)
+  const [drawn, setDrawn] = useState(null)
+  const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [revealReady, setRevealReady] = useState(false)
-  const [landedTier, setLandedTier] = useState(null)
-  const [counts, setCounts] = useState({})
 
-  // Load catalogue distribution so slice sizes mirror real composition
+  // Once the parent confirms a real active assignment, drop the ticket state
   useEffect(() => {
-    ;(async () => {
-      const { data } = await supabase.from('challenges').select('points').eq('is_active', true)
-      const c = {}
-      ;(data || []).forEach((row) => {
-        const k = tierForPoints(row.points).key
-        c[k] = (c[k] || 0) + 1
-      })
-      setCounts(c)
-    })()
-  }, [])
-
-  const slices = buildSlices(counts)
+    if (active) setDrawn(null)
+  }, [active])
 
   async function claim() {
     setErr('')
-    setSpinning(true)
-    setRevealReady(false)
-    setLandedTier(null)
-
+    setBusy(true)
     const { data: assignmentId, error } = await supabase.rpc('assign_random_challenge')
     if (error) {
       setErr(error.message)
-      setSpinning(false)
+      setBusy(false)
       return
     }
     const { data: a } = await supabase
-      .from('assignments').select('challenge:challenges(points)').eq('id', assignmentId).single()
+      .from('assignments').select('challenge:challenges(title, points)').eq('id', assignmentId).single()
+    const title = a?.challenge?.title || 'Mystery challenge'
     const pts = a?.challenge?.points || 1
-    const tier = tierForPoints(pts)
-    const slice = slices.find((s) => s.key === tier.key) || slices[0]
-
-    // Land the pointer (top, 0deg) inside the winning slice, slightly randomised
-    const jitter = (Math.random() - 0.5) * Math.max(slice.sweep * 0.6, 2)
-    const target = slice.mid + jitter
-    const finalRotation = 6 * 360 + (360 - target)
-
-    setRotation(finalRotation)
-    setLandedTier(tier)
-    setTimeout(() => {
-      setSpinning(false)
-      setRevealReady(true)
-    }, 4100)
+    setDrawn({ title, points: pts, tier: tierForPoints(pts) })
+    setBusy(false)
   }
 
-  function reveal() {
-    setRevealReady(false)
-    setRotation(0)
-    onChange()
-  }
-
-  if (!active && (spinning || revealReady)) {
-    return (
-      <div className="wheel-stage">
-        <div className="wheel-wrap">
-          <div className="wheel-pointer" />
-          <svg
-            className="wheel-svg"
-            viewBox="0 0 200 200"
-            style={{
-              transform: `rotate(${rotation}deg)`,
-              transition: spinning ? 'transform 4s cubic-bezier(.12,.72,.14,1)' : 'none',
-            }}
-          >
-            <circle cx="100" cy="100" r="98" fill="#fff" />
-            {slices.map((s) => (
-              <path key={s.key} d={arcPath(100, 100, 96, s.start, s.sweep)} fill={s.color} />
-            ))}
-            {slices.filter((s) => s.sweep > 22).map((s) => (
-              <text
-                key={s.key}
-                x="100"
-                y="34"
-                textAnchor="middle"
-                className="wheel-label"
-                transform={`rotate(${s.mid} 100 100)`}
-              >
-                {s.label}
-              </text>
-            ))}
-            <circle cx="100" cy="100" r="97" fill="none" stroke="#e6e6ea" strokeWidth="4" />
-            <circle cx="100" cy="100" r="16" fill="#fff" stroke="#e6e6ea" strokeWidth="3" />
-          </svg>
-        </div>
-        {spinning ? (
-          <p className="wheel-caption">Drawing your fate…</p>
-        ) : (
-          <>
-            <p className="wheel-result" style={{ color: landedTier?.color }}>{landedTier?.label}</p>
-            <button className="btn-primary big" onClick={reveal}>Reveal challenge</button>
-          </>
-        )}
-      </div>
-    )
+  if (!active && drawn) {
+    return <ScratchTicket drawn={drawn} onViewDetails={onChange} />
   }
 
   if (!active) {
@@ -419,13 +319,170 @@ function ChallengeScreen({ uid, active, onChange }) {
         <p className="empty-eyebrow">NO ACTIVE CHALLENGE</p>
         <h2>Ready to prove it?</h2>
         <p className="empty-body">You don't choose. Claim a challenge and the clock starts. Miss the deadline and it's a loss.</p>
-        <button className="btn-primary big" onClick={claim} disabled={spinning}>{spinning ? 'Drawing…' : 'Claim a challenge'}</button>
+        <button className="btn-primary big" onClick={claim} disabled={busy}>{busy ? 'Drawing…' : 'Claim a challenge'}</button>
         {err && <p className="auth-msg">{err}</p>}
       </div>
     )
   }
   const submission = (active.submissions || []).find((s) => s.status !== 'rejected')
   return <ActiveChallenge active={active} submission={submission} uid={uid} onChange={onChange} />
+}
+
+const SCRATCH_THRESHOLD = 0.7
+
+function ScratchTicket({ drawn, onViewDetails }) {
+  const wrapRef = useRef(null)
+  const canvasRef = useRef(null)
+  const ctxRef = useRef(null)
+  const sizeRef = useRef({ w: 0, h: 0 })
+  const lastPointRef = useRef(null)
+  const drawingRef = useRef(false)
+  const moveCountRef = useRef(0)
+  const revealedRef = useRef(false)
+
+  const [revealed, setRevealed] = useState(false)
+  const [fading, setFading] = useState(false)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const wrap = wrapRef.current
+    if (!canvas || !wrap) return
+    const dpr = window.devicePixelRatio || 1
+    const rect = wrap.getBoundingClientRect()
+    canvas.width = rect.width * dpr
+    canvas.height = rect.height * dpr
+    canvas.style.width = rect.width + 'px'
+    canvas.style.height = rect.height + 'px'
+    const ctx = canvas.getContext('2d')
+    ctx.scale(dpr, dpr)
+    sizeRef.current = { w: rect.width, h: rect.height }
+    ctxRef.current = ctx
+    drawFoil(ctx, rect.width, rect.height)
+  }, [])
+
+  function drawFoil(ctx, w, h) {
+    const grad = ctx.createLinearGradient(0, 0, w, h)
+    grad.addColorStop(0, '#d7dbe0')
+    grad.addColorStop(0.5, '#eef0f3')
+    grad.addColorStop(1, '#c7ccd3')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, w, h)
+
+    ctx.save()
+    ctx.globalAlpha = 0.08
+    ctx.fillStyle = '#e5142d'
+    ctx.font = '700 12px "Space Grotesk", sans-serif'
+    ctx.translate(w / 2, h / 2)
+    ctx.rotate(-0.35)
+    for (let y = -h; y < h; y += 26) {
+      for (let x = -w; x < w; x += 90) {
+        ctx.fillText('PROVE IT', x, y)
+      }
+    }
+    ctx.restore()
+
+    ctx.fillStyle = 'rgba(20,20,26,0.55)'
+    ctx.font = '700 13px "Space Grotesk", sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('SCRATCH TO REVEAL', w / 2, h / 2)
+  }
+
+  function pointFromEvent(e) {
+    const rect = canvasRef.current.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  function scratchTo(pt) {
+    const ctx = ctxRef.current
+    if (!ctx) return
+    const last = lastPointRef.current || pt
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.lineWidth = 44
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.beginPath()
+    ctx.moveTo(last.x, last.y)
+    ctx.lineTo(pt.x, pt.y)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(pt.x, pt.y, 22, 0, Math.PI * 2)
+    ctx.fill()
+    lastPointRef.current = pt
+  }
+
+  function checkProgress() {
+    const ctx = ctxRef.current
+    const { w, h } = sizeRef.current
+    if (!ctx || !w || !h) return
+    const data = ctx.getImageData(0, 0, Math.floor(w), Math.floor(h)).data
+    let cleared = 0
+    let total = 0
+    for (let i = 3; i < data.length; i += 4 * 7) {
+      total++
+      if (data[i] < 24) cleared++
+    }
+    const pct = total ? cleared / total : 0
+    if (pct >= SCRATCH_THRESHOLD && !revealedRef.current) {
+      revealedRef.current = true
+      ctx.clearRect(0, 0, w, h)
+      setFading(true)
+      setTimeout(() => setRevealed(true), 360)
+    }
+  }
+
+  function handleDown(e) {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    drawingRef.current = true
+    const pt = pointFromEvent(e)
+    lastPointRef.current = pt
+    scratchTo(pt)
+  }
+  function handleMove(e) {
+    if (!drawingRef.current) return
+    scratchTo(pointFromEvent(e))
+    moveCountRef.current += 1
+    if (moveCountRef.current % 4 === 0) checkProgress()
+  }
+  function handleUp() {
+    drawingRef.current = false
+    lastPointRef.current = null
+    checkProgress()
+  }
+
+  return (
+    <div className="wheel-stage">
+      <div className="ticket-card">
+        <div className="ticket-header">
+          PROVE<span>IT</span>
+          <span className="ticket-header-sub">SCRATCH &amp; PROVE</span>
+        </div>
+        <div className="ticket-body" ref={wrapRef}>
+          <div className="ticket-content">
+            <span className="ticket-tier" style={{ color: drawn.tier.color }}>{drawn.tier.label}</span>
+            <span className="ticket-title">{drawn.title}</span>
+            <span className="ticket-points">{drawn.points} PTS</span>
+          </div>
+          {!revealed && (
+            <canvas
+              ref={canvasRef}
+              className={`ticket-canvas ${fading ? 'fading' : ''}`}
+              onPointerDown={handleDown}
+              onPointerMove={handleMove}
+              onPointerUp={handleUp}
+              onPointerLeave={handleUp}
+            />
+          )}
+        </div>
+        <div className="ticket-perf" />
+      </div>
+      {revealed ? (
+        <button className="btn-primary big" onClick={onViewDetails}>View details</button>
+      ) : (
+        <p className="wheel-caption">Scratch to reveal your fate…</p>
+      )}
+    </div>
+  )
 }
 
 function ActiveChallenge({ active, submission, uid, onChange }) {
