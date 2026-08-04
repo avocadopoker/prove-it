@@ -330,7 +330,7 @@ function ChallengeScreen({ uid, active, onChange }) {
 
 const SCRATCH_REVEAL_THRESHOLD = 0.8
 
-function ScratchPatch({ className, content, countsRef, onProgress }) {
+function ScratchPatch({ className, content, countsRef, onProgress, foilLabel }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const ctxRef = useRef(null)
@@ -377,11 +377,14 @@ function ScratchPatch({ className, content, countsRef, onProgress }) {
     }
     ctx.restore()
 
-    ctx.fillStyle = 'rgba(20,20,26,0.5)'
-    ctx.font = '700 11px "Space Grotesk", sans-serif'
+    ctx.fillStyle = 'rgba(20,20,26,0.55)'
+    ctx.font = '700 10px "Space Grotesk", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('SCRATCH', w / 2, h / 2)
+    ctx.fillText(foilLabel || 'SCRATCH', w / 2, h / 2 - 8)
+    ctx.font = '600 9px "Space Grotesk", sans-serif'
+    ctx.globalAlpha = 0.7
+    ctx.fillText('scratch to reveal', w / 2, h / 2 + 10)
   }
 
   function pointFromEvent(e) {
@@ -477,6 +480,7 @@ function ScratchTicket({ drawn, onViewDetails }) {
             className="ticket-patch-difficulty"
             countsRef={diffCounts}
             onProgress={recompute}
+            foilLabel="DIFFICULTY"
             content={
               <>
                 <span className="ticket-tier" style={{ color: drawn.tier.color }}>{drawn.tier.label}</span>
@@ -488,18 +492,15 @@ function ScratchTicket({ drawn, onViewDetails }) {
             className="ticket-patch-domain"
             countsRef={domainCounts}
             onProgress={recompute}
-            content={
-              <>
-                <span className="ticket-section-label">DOMAIN</span>
-                <span className="ticket-domain-big">{drawn.domain || 'General'}</span>
-              </>
-            }
+            foilLabel="DOMAIN"
+            content={<span className="ticket-domain-big">{drawn.domain || 'General'}</span>}
           />
         </div>
         <ScratchPatch
           className="ticket-patch-title"
           countsRef={titleCounts}
           onProgress={recompute}
+          foilLabel="CHALLENGE"
           content={<span className="ticket-title">{drawn.title}</span>}
         />
       </div>

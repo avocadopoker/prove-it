@@ -242,7 +242,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .ticket-patch-domain { flex: 1; }
 .ticket-patch-title { height: 130px; }
 
-.scratch-patch { position: relative; height: 100%; }
+.scratch-patch { position: relative; }
 .scratch-patch-content {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 0.4rem; padding: 0.9rem; text-align: center;
@@ -254,9 +254,6 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .ticket-points {
   font-family: var(--display); font-weight: 700; font-size: 0.85rem; color: var(--red);
   background: var(--red-soft); padding: 0.2rem 0.6rem; border-radius: 20px;
-}
-.ticket-section-label {
-  font-family: var(--display); font-weight: 700; font-size: 0.6rem; letter-spacing: 0.14em; color: var(--muted);
 }
 .ticket-domain-big {
   font-family: var(--display); font-weight: 700; font-size: 0.95rem; color: var(--black); line-height: 1.2;
