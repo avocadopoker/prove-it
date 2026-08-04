@@ -328,9 +328,9 @@ function ChallengeScreen({ uid, active, onChange }) {
   return <ActiveChallenge active={active} submission={submission} uid={uid} onChange={onChange} />
 }
 
-const SCRATCH_THRESHOLD = 0.7
+const SCRATCH_REVEAL_THRESHOLD = 0.8
 
-function ScratchTicket({ drawn, onViewDetails }) {
+function ScratchPatch({ className, content, countsRef, onProgress }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const ctxRef = useRef(null)
@@ -338,10 +338,6 @@ function ScratchTicket({ drawn, onViewDetails }) {
   const lastPointRef = useRef(null)
   const drawingRef = useRef(false)
   const moveCountRef = useRef(0)
-  const revealedRef = useRef(false)
-
-  const [revealed, setRevealed] = useState(false)
-  const [fading, setFading] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -371,21 +367,21 @@ function ScratchTicket({ drawn, onViewDetails }) {
     ctx.save()
     ctx.globalAlpha = 0.08
     ctx.fillStyle = '#e5142d'
-    ctx.font = '700 12px "Space Grotesk", sans-serif'
+    ctx.font = '700 11px "Space Grotesk", sans-serif'
     ctx.translate(w / 2, h / 2)
     ctx.rotate(-0.35)
-    for (let y = -h; y < h; y += 26) {
-      for (let x = -w; x < w; x += 90) {
+    for (let y = -h; y < h; y += 22) {
+      for (let x = -w; x < w; x += 80) {
         ctx.fillText('PROVE IT', x, y)
       }
     }
     ctx.restore()
 
-    ctx.fillStyle = 'rgba(20,20,26,0.55)'
-    ctx.font = '700 13px "Space Grotesk", sans-serif'
+    ctx.fillStyle = 'rgba(20,20,26,0.5)'
+    ctx.font = '700 11px "Space Grotesk", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('SCRATCH TO REVEAL', w / 2, h / 2)
+    ctx.fillText('SCRATCH', w / 2, h / 2)
   }
 
   function pointFromEvent(e) {
@@ -398,7 +394,7 @@ function ScratchTicket({ drawn, onViewDetails }) {
     if (!ctx) return
     const last = lastPointRef.current || pt
     ctx.globalCompositeOperation = 'destination-out'
-    ctx.lineWidth = 44
+    ctx.lineWidth = 40
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.beginPath()
@@ -406,12 +402,12 @@ function ScratchTicket({ drawn, onViewDetails }) {
     ctx.lineTo(pt.x, pt.y)
     ctx.stroke()
     ctx.beginPath()
-    ctx.arc(pt.x, pt.y, 22, 0, Math.PI * 2)
+    ctx.arc(pt.x, pt.y, 20, 0, Math.PI * 2)
     ctx.fill()
     lastPointRef.current = pt
   }
 
-  function checkProgress() {
+  function reportProgress() {
     const ctx = ctxRef.current
     const { w, h } = sizeRef.current
     if (!ctx || !w || !h) return
@@ -422,13 +418,8 @@ function ScratchTicket({ drawn, onViewDetails }) {
       total++
       if (data[i] < 24) cleared++
     }
-    const pct = total ? cleared / total : 0
-    if (pct >= SCRATCH_THRESHOLD && !revealedRef.current) {
-      revealedRef.current = true
-      ctx.clearRect(0, 0, w, h)
-      setFading(true)
-      setTimeout(() => setRevealed(true), 360)
-    }
+    countsRef.current = { cleared, total }
+    onProgress()
   }
 
   function handleDown(e) {
@@ -442,42 +433,77 @@ function ScratchTicket({ drawn, onViewDetails }) {
     if (!drawingRef.current) return
     scratchTo(pointFromEvent(e))
     moveCountRef.current += 1
-    if (moveCountRef.current % 4 === 0) checkProgress()
+    if (moveCountRef.current % 4 === 0) reportProgress()
   }
   function handleUp() {
     drawingRef.current = false
     lastPointRef.current = null
-    checkProgress()
+    reportProgress()
+  }
+
+  return (
+    <div className={`scratch-patch ${className || ''}`} ref={wrapRef}>
+      <div className="scratch-patch-content">{content}</div>
+      <canvas
+        ref={canvasRef}
+        className="ticket-canvas"
+        onPointerDown={handleDown}
+        onPointerMove={handleMove}
+        onPointerUp={handleUp}
+        onPointerLeave={handleUp}
+      />
+    </div>
+  )
+}
+
+function ScratchTicket({ drawn, onViewDetails }) {
+  const diffCounts = useRef({ cleared: 0, total: 0 })
+  const domainCounts = useRef({ cleared: 0, total: 0 })
+  const titleCounts = useRef({ cleared: 0, total: 0 })
+  const [showButton, setShowButton] = useState(false)
+
+  function recompute() {
+    const cleared = diffCounts.current.cleared + domainCounts.current.cleared + titleCounts.current.cleared
+    const total = diffCounts.current.total + domainCounts.current.total + titleCounts.current.total
+    const pct = total ? cleared / total : 0
+    if (pct >= SCRATCH_REVEAL_THRESHOLD) setShowButton(true)
   }
 
   return (
     <div className="wheel-stage">
       <div className="ticket-card">
-        <div className="ticket-header">
-          PROVE<span>IT</span>
-          <span className="ticket-header-sub">SCRATCH &amp; PROVE</span>
+        <div className="ticket-top">
+          <ScratchPatch
+            className="ticket-patch-difficulty"
+            countsRef={diffCounts}
+            onProgress={recompute}
+            content={
+              <>
+                <span className="ticket-tier" style={{ color: drawn.tier.color }}>{drawn.tier.label}</span>
+                <span className="ticket-points">{drawn.points} PTS</span>
+              </>
+            }
+          />
+          <ScratchPatch
+            className="ticket-patch-domain"
+            countsRef={domainCounts}
+            onProgress={recompute}
+            content={
+              <>
+                <span className="ticket-section-label">DOMAIN</span>
+                <span className="ticket-domain-big">{drawn.domain || 'General'}</span>
+              </>
+            }
+          />
         </div>
-        <div className="ticket-body" ref={wrapRef}>
-          <div className="ticket-content">
-            <span className="ticket-tier" style={{ color: drawn.tier.color }}>{drawn.tier.label}</span>
-            {drawn.domain && <span className="ticket-domain">{drawn.domain}</span>}
-            <span className="ticket-title">{drawn.title}</span>
-            <span className="ticket-points">{drawn.points} PTS</span>
-          </div>
-          {!revealed && (
-            <canvas
-              ref={canvasRef}
-              className={`ticket-canvas ${fading ? 'fading' : ''}`}
-              onPointerDown={handleDown}
-              onPointerMove={handleMove}
-              onPointerUp={handleUp}
-              onPointerLeave={handleUp}
-            />
-          )}
-        </div>
-        <div className="ticket-perf" />
+        <ScratchPatch
+          className="ticket-patch-title"
+          countsRef={titleCounts}
+          onProgress={recompute}
+          content={<span className="ticket-title">{drawn.title}</span>}
+        />
       </div>
-      {revealed ? (
+      {showButton ? (
         <button className="btn-primary big" onClick={onViewDetails}>View details</button>
       ) : (
         <p className="wheel-caption">Scratch to reveal your fate…</p>
