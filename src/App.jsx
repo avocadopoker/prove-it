@@ -397,7 +397,7 @@ function ScratchPatch({ className, content, countsRef, onProgress, foilLabel }) 
     if (!ctx) return
     const last = lastPointRef.current || pt
     ctx.globalCompositeOperation = 'destination-out'
-    ctx.lineWidth = 40
+    ctx.lineWidth = 24
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.beginPath()
@@ -405,7 +405,7 @@ function ScratchPatch({ className, content, countsRef, onProgress, foilLabel }) 
     ctx.lineTo(pt.x, pt.y)
     ctx.stroke()
     ctx.beginPath()
-    ctx.arc(pt.x, pt.y, 20, 0, Math.PI * 2)
+    ctx.arc(pt.x, pt.y, 12, 0, Math.PI * 2)
     ctx.fill()
     lastPointRef.current = pt
   }
