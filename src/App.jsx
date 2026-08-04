@@ -287,11 +287,6 @@ function ChallengeScreen({ uid, active, onChange }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  // Once the parent confirms a real active assignment, drop the ticket state
-  useEffect(() => {
-    if (active) setDrawn(null)
-  }, [active])
-
   async function claim() {
     setErr('')
     setBusy(true)
@@ -307,10 +302,18 @@ function ChallengeScreen({ uid, active, onChange }) {
     const pts = a?.challenge?.points || 1
     setDrawn({ title, points: pts, domain: a?.challenge?.domain || '', tier: tierForPoints(pts) })
     setBusy(false)
+    // Make the assignment "real" to the rest of the app right away. The ticket keeps showing
+    // on this mount regardless (it's gated on `drawn`, not `active`) — but if the user leaves
+    // this tab before finishing the ticket, the component unmounts and `drawn` is lost. On
+    // return, `active` is already populated, so they land straight on the real challenge
+    // screen instead of being shown "claim a challenge" again for a challenge they already have.
+    onChange()
   }
 
-  if (!active && drawn) {
-    return <ScratchTicket drawn={drawn} onViewDetails={onChange} />
+  // Ticket is purely local-state driven so it isn't yanked away the instant `active` populates
+  // in the background (which now happens immediately on claim, see above).
+  if (drawn) {
+    return <ScratchTicket drawn={drawn} onViewDetails={() => setDrawn(null)} />
   }
 
   if (!active) {
