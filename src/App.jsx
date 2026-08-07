@@ -124,7 +124,8 @@ function Main({ session }) {
   const [tab, setTab] = useState('home')
   const [overlay, setOverlay] = useState(null) // {type:'settings'} | {type:'profile',userId} | {type:'assignment',id}
   const [profile, setProfile] = useState(null)
-  const [active, setActive] = useState(null)
+  const [activeShort, setActiveShort] = useState(null)
+  const [activeLong, setActiveLong] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const bump = useCallback(() => setRefreshKey((k) => k + 1), [])
   const openProfile = useCallback((userId) => setOverlay({ type: 'profile', userId }), [])
@@ -135,11 +136,13 @@ function Main({ session }) {
       await supabase.rpc('expire_overdue_assignments')
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', uid).single()
       setProfile(prof)
-      const { data: a } = await supabase.from('assignments')
+      const { data: rows } = await supabase.from('assignments')
         .select('*, challenge:challenges(*), submissions(*)')
         .eq('user_id', uid).in('status', ['active', 'submitted'])
-        .order('assigned_at', { ascending: false }).limit(1).maybeSingle()
-      setActive(a || null)
+        .order('assigned_at', { ascending: false })
+      const list = rows || []
+      setActiveShort(list.find((r) => r.track === 'short') || null)
+      setActiveLong(list.find((r) => r.track === 'long') || null)
     })()
   }, [uid, refreshKey])
 
@@ -153,15 +156,15 @@ function Main({ session }) {
       </header>
 
       <main className="screen">
-        {tab === 'home' && <Home uid={uid} active={active} openProfile={openProfile} openAssignment={openAssignment} />}
-        {tab === 'challenge' && <ChallengeScreen uid={uid} active={active} onChange={bump} />}
+        {tab === 'home' && <Home uid={uid} activeShort={activeShort} activeLong={activeLong} openProfile={openProfile} openAssignment={openAssignment} />}
+        {tab === 'challenge' && <ChallengeScreen uid={uid} activeShort={activeShort} activeLong={activeLong} onChange={bump} />}
         {tab === 'ranks' && <RanksScreen uid={uid} openProfile={openProfile} />}
         {tab === 'friends' && <FriendsScreen uid={uid} openProfile={openProfile} />}
       </main>
 
       <nav className="tabbar">
         <button className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')}>Home</button>
-        <button className={tab === 'challenge' ? 'on' : ''} onClick={() => setTab('challenge')}>Challenge</button>
+        <button className={tab === 'challenge' ? 'on' : ''} onClick={() => setTab('challenge')}>Challenges</button>
         <button className={tab === 'ranks' ? 'on' : ''} onClick={() => setTab('ranks')}>Ranks</button>
         <button className={tab === 'friends' ? 'on' : ''} onClick={() => setTab('friends')}>Friends</button>
       </nav>
@@ -179,7 +182,7 @@ function Main({ session }) {
 
 /* ---------------- HOME ---------------- */
 
-function Home({ uid, active, openProfile, openAssignment }) {
+function Home({ uid, activeShort, activeLong, openProfile, openAssignment }) {
   const [feed, setFeed] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -194,16 +197,29 @@ function Home({ uid, active, openProfile, openAssignment }) {
 
   return (
     <div className="home">
-      <div className="current-card">
-        <span className="eyebrow">YOUR CURRENT CHALLENGE</span>
-        {active ? (
-          <>
-            <p className="current-title">{active.challenge.title}</p>
-            <Countdown deadline={active.deadline} />
-          </>
-        ) : (
-          <p className="current-empty">No active challenge — head to Challenge to claim one.</p>
-        )}
+      <div className="current-row">
+        <div className="current-card small">
+          <span className="eyebrow">SHORT (≤14D)</span>
+          {activeShort ? (
+            <>
+              <p className="current-title">{activeShort.challenge.title}</p>
+              <Countdown deadline={activeShort.deadline} />
+            </>
+          ) : (
+            <p className="current-empty">No active challenge yet.</p>
+          )}
+        </div>
+        <div className="current-card small">
+          <span className="eyebrow">LONG (14D+)</span>
+          {activeLong ? (
+            <>
+              <p className="current-title">{activeLong.challenge.title}</p>
+              <Countdown deadline={activeLong.deadline} />
+            </>
+          ) : (
+            <p className="current-empty">No active challenge yet.</p>
+          )}
+        </div>
       </div>
 
       <span className="section-head">RECENT ACTIVITY</span>
@@ -282,7 +298,24 @@ function tierForPoints(pts) {
   return TIERS.find((t) => pts >= t.min && pts <= t.max) || TIERS[0]
 }
 
-function ChallengeScreen({ uid, active, onChange }) {
+function ChallengeScreen({ uid, activeShort, activeLong, onChange }) {
+  const [subTab, setSubTab] = useState('short')
+  return (
+    <div>
+      <div className="seg">
+        <button className={subTab === 'short' ? 'on' : ''} onClick={() => setSubTab('short')}>Short · ≤14 days</button>
+        <button className={subTab === 'long' ? 'on' : ''} onClick={() => setSubTab('long')}>Long · 14+ days</button>
+      </div>
+      {subTab === 'short' ? (
+        <ChallengeTrack uid={uid} active={activeShort} track="short" onChange={onChange} />
+      ) : (
+        <ChallengeTrack uid={uid} active={activeLong} track="long" onChange={onChange} />
+      )}
+    </div>
+  )
+}
+
+function ChallengeTrack({ uid, active, track, onChange }) {
   const [drawn, setDrawn] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -290,7 +323,7 @@ function ChallengeScreen({ uid, active, onChange }) {
   async function claim() {
     setErr('')
     setBusy(true)
-    const { data: assignmentId, error } = await supabase.rpc('assign_random_challenge')
+    const { data: assignmentId, error } = await supabase.rpc('assign_random_challenge', { p_track: track })
     if (error) {
       setErr(error.message)
       setBusy(false)
@@ -564,9 +597,7 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
         <span className="pts-badge">{c.points} PT{c.points === 1 ? '' : 'S'}</span>
         <Countdown deadline={active.deadline} />
       </div>
-      {c.domain && <span className="domain-tag">{c.domain}</span>}
       <h2 className="active-title">{c.title}</h2>
-      <p className="active-desc">{c.description}</p>
 
       <ProgressComposer assignmentId={active.id} uid={uid} />
 
