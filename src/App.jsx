@@ -199,26 +199,30 @@ function Home({ uid, activeShort, activeLong, openProfile, openAssignment }) {
     <div className="home">
       <div className="current-row">
         <div className="current-card small">
-          <span className="eyebrow">SHORT (≤14D)</span>
-          {activeShort ? (
-            <>
+          <span className="eyebrow">SHORT TERM</span>
+          <div className="current-body">
+            {activeShort ? (
               <p className="current-title">{activeShort.challenge.title}</p>
-              <Countdown deadline={activeShort.deadline} />
-            </>
-          ) : (
-            <p className="current-empty">No active challenge yet.</p>
-          )}
+            ) : (
+              <p className="current-empty">No active challenge yet.</p>
+            )}
+          </div>
+          <div className="current-time-row">
+            {activeShort ? <Countdown deadline={activeShort.deadline} /> : <span className="current-time-empty">—</span>}
+          </div>
         </div>
         <div className="current-card small">
-          <span className="eyebrow">LONG (14D+)</span>
-          {activeLong ? (
-            <>
+          <span className="eyebrow">LONG TERM</span>
+          <div className="current-body">
+            {activeLong ? (
               <p className="current-title">{activeLong.challenge.title}</p>
-              <Countdown deadline={activeLong.deadline} />
-            </>
-          ) : (
-            <p className="current-empty">No active challenge yet.</p>
-          )}
+            ) : (
+              <p className="current-empty">No active challenge yet.</p>
+            )}
+          </div>
+          <div className="current-time-row">
+            {activeLong ? <Countdown deadline={activeLong.deadline} /> : <span className="current-time-empty">—</span>}
+          </div>
         </div>
       </div>
 
@@ -354,7 +358,7 @@ function ChallengeTrack({ uid, active, track, onChange }) {
       <div className="challenge-empty">
         <p className="empty-eyebrow">NO ACTIVE CHALLENGE</p>
         <h2>Ready to prove it?</h2>
-        <p className="empty-body">You don't choose. Claim a challenge and the clock starts. Miss the deadline and it's a loss.</p>
+        <p className="empty-body">You don't choose the challenge. The challenge chooses you. Get started.</p>
         <button className="btn-primary big" onClick={claim} disabled={busy}>{busy ? 'Drawing…' : 'Claim a challenge'}</button>
         {err && <p className="auth-msg">{err}</p>}
       </div>
@@ -363,8 +367,6 @@ function ChallengeTrack({ uid, active, track, onChange }) {
   const submission = (active.submissions || []).find((s) => s.status !== 'rejected')
   return <ActiveChallenge active={active} submission={submission} uid={uid} onChange={onChange} />
 }
-
-const SCRATCH_REVEAL_THRESHOLD = 0.8
 
 function ScratchPatch({ className, content, countsRef, onProgress, foilLabel }) {
   const wrapRef = useRef(null)
@@ -499,13 +501,11 @@ function ScratchTicket({ drawn, onViewDetails }) {
   const diffCounts = useRef({ cleared: 0, total: 0 })
   const domainCounts = useRef({ cleared: 0, total: 0 })
   const titleCounts = useRef({ cleared: 0, total: 0 })
-  const [showButton, setShowButton] = useState(false)
+  const [touched, setTouched] = useState(false)
 
   function recompute() {
     const cleared = diffCounts.current.cleared + domainCounts.current.cleared + titleCounts.current.cleared
-    const total = diffCounts.current.total + domainCounts.current.total + titleCounts.current.total
-    const pct = total ? cleared / total : 0
-    if (pct >= SCRATCH_REVEAL_THRESHOLD) setShowButton(true)
+    if (cleared > 0) setTouched(true)
   }
 
   return (
@@ -540,10 +540,11 @@ function ScratchTicket({ drawn, onViewDetails }) {
           content={<span className="ticket-title">{drawn.title}</span>}
         />
       </div>
-      {showButton ? (
-        <button className="btn-primary big" onClick={onViewDetails}>View details</button>
-      ) : (
-        <p className="wheel-caption">Scratch to reveal your fate…</p>
+      {!touched && <p className="wheel-caption">Scratch to reveal your fate…</p>}
+      {touched && (
+        <div className="ticket-action-bar">
+          <button className="btn-primary big" onClick={onViewDetails}>View details</button>
+        </div>
       )}
     </div>
   )
