@@ -307,8 +307,8 @@ function ChallengeScreen({ uid, activeShort, activeLong, onChange }) {
   return (
     <div>
       <div className="seg">
-        <button className={subTab === 'short' ? 'on' : ''} onClick={() => setSubTab('short')}>Short · ≤14 days</button>
-        <button className={subTab === 'long' ? 'on' : ''} onClick={() => setSubTab('long')}>Long · 14+ days</button>
+        <button className={subTab === 'short' ? 'on' : ''} onClick={() => setSubTab('short')}>Short Term</button>
+        <button className={subTab === 'long' ? 'on' : ''} onClick={() => setSubTab('long')}>Long Term</button>
       </div>
       {subTab === 'short' ? (
         <ChallengeTrack uid={uid} active={activeShort} track="short" onChange={onChange} />
