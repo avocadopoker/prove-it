@@ -207,9 +207,6 @@ function Home({ uid, activeShort, activeLong, openProfile, openAssignment }) {
               <p className="current-empty">No active challenge yet.</p>
             )}
           </div>
-          <div className="current-time-row">
-            {activeShort ? <Countdown deadline={activeShort.deadline} /> : <span className="current-time-empty">—</span>}
-          </div>
         </div>
         <div className="current-card small">
           <span className="eyebrow">LONG TERM</span>
@@ -219,9 +216,6 @@ function Home({ uid, activeShort, activeLong, openProfile, openAssignment }) {
             ) : (
               <p className="current-empty">No active challenge yet.</p>
             )}
-          </div>
-          <div className="current-time-row">
-            {activeLong ? <Countdown deadline={activeLong.deadline} /> : <span className="current-time-empty">—</span>}
           </div>
         </div>
       </div>
@@ -259,36 +253,6 @@ function Home({ uid, activeShort, activeLong, openProfile, openAssignment }) {
     </div>
   )
 }
-
-function Countdown({ deadline }) {
-  const [left, setLeft] = useState(msLeft(deadline))
-  useEffect(() => {
-    const t = setInterval(() => setLeft(msLeft(deadline)), 1000)
-    return () => clearInterval(t)
-  }, [deadline])
-  if (left <= 0) return <span className="countdown over">Time's up</span>
-
-  const HOUR = 3600000
-  const DAY = 86400000
-
-  if (left > 2 * DAY) {
-    const d = Math.ceil(left / DAY)
-    return <span className="countdown">{d} {d === 1 ? 'Day' : 'Days'} left</span>
-  }
-  if (left > DAY) {
-    const h = Math.ceil(left / HOUR)
-    return <span className="countdown">{h} {h === 1 ? 'hour' : 'hours'} left</span>
-  }
-  const h = Math.floor(left / HOUR)
-  const m = Math.floor((left % HOUR) / 60000)
-  const s = Math.floor((left % 60000) / 1000)
-  return (
-    <span className="countdown">
-      {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
-    </span>
-  )
-}
-function msLeft(deadline) { return new Date(deadline).getTime() - Date.now() }
 
 /* ---------------- CHALLENGE ---------------- */
 
@@ -596,7 +560,6 @@ function ActiveChallenge({ active, submission, uid, onChange }) {
     <div className="active">
       <div className="active-head">
         <span className="pts-badge">{c.points} PT{c.points === 1 ? '' : 'S'}</span>
-        <Countdown deadline={active.deadline} />
       </div>
       <h2 className="active-title">{c.title}</h2>
 
